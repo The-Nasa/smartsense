@@ -286,25 +286,104 @@ export const api = {
     }
   },
 
-  updateUsuario: async (userData: Partial<Usuario>): Promise<Usuario> => {
+  getUsuarios: async (): Promise<Usuario[]> => {
     const conf = getSupabaseConfig();
-    const updatedMock = mockDb.updateUsuario(userData);
-    
     if (conf.isMock || !supabase) {
-      return updatedMock;
+      // Devuelve la lista simulada que incluye al principal y los extras si existen
+      const principal = mockDb.getUsuario();
+      const extras = JSON.parse(localStorage.getItem('smartsense_users_list') || '[]');
+      return [principal, ...extras];
     }
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .update(userData)
-        .eq('id', 1)
+        .select('*')
+        .order('id', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.warn('Error fetching all users, falling back to mock:', err);
+      return [mockDb.getUsuario()];
+    }
+  },
+
+  addUsuario: async (userData: Omit<Usuario, 'id'>): Promise<Usuario> => {
+    const conf = getSupabaseConfig();
+    if (conf.isMock || !supabase) {
+      const newMockUser: Usuario = {
+        id: Date.now(),
+        ...userData
+      };
+      const currentUsers = JSON.parse(localStorage.getItem('smartsense_users_list') || '[]');
+      currentUsers.push(newMockUser);
+      localStorage.setItem('smartsense_users_list', JSON.stringify(currentUsers));
+      return newMockUser;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .insert([userData])
         .select()
         .single();
       if (error) throw error;
       return data;
     } catch (err) {
-      console.error('Error updating Supabase user:', err);
-      return updatedMock;
+      console.error('Error adding user to Supabase:', err);
+      throw err;
+    }
+  },
+
+  deleteUsuario: async (id: number): Promise<boolean> => {
+    const conf = getSupabaseConfig();
+    if (conf.isMock || !supabase) {
+      const currentUsers = JSON.parse(localStorage.getItem('smartsense_users_list') || '[]');
+      const filtered = currentUsers.filter((u: any) => u.id !== id);
+      localStorage.setItem('smartsense_users_list', JSON.stringify(filtered));
+      return true;
+    }
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error deleting user from Supabase:', err);
+      return false;
+    }
+  },
+
+  updateUsuario: async (id: number, userData: Partial<Usuario>): Promise<Usuario> => {
+    const conf = getSupabaseConfig();
+    
+    if (conf.isMock || !supabase) {
+      if (id === 1) {
+        return mockDb.updateUsuario(userData);
+      }
+      const currentUsers = JSON.parse(localStorage.getItem('smartsense_users_list') || '[]');
+      const updatedList = currentUsers.map((u: any) => {
+        if (u.id === id) {
+          return { ...u, ...userData };
+        }
+        return u;
+      });
+      localStorage.setItem('smartsense_users_list', JSON.stringify(updatedList));
+      return { id, ...userData } as Usuario;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .update(userData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error(`Error updating Supabase user id=${id}:`, err);
+      if (id === 1) return mockDb.updateUsuario(userData);
+      throw err;
     }
   },
 

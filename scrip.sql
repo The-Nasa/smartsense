@@ -43,3 +43,12 @@ alter publication supabase_realtime add table gas_eventos;
 alter table configuracion disable row level security;
 alter table usuarios disable row level security;
 alter table gas_eventos disable row level security;
+
+-- 4. MIGRACIÓN: Soporte para múltiples usuarios autoincrementables (Ejecutar en SQL Editor)
+alter table usuarios alter column id drop default;
+create sequence if not exists usuarios_id_seq;
+alter table usuarios alter column id set default nextval('usuarios_id_seq');
+alter sequence usuarios_id_seq owned by usuarios.id;
+-- Ajustar secuencia para que el siguiente ID autogenerado sea 2 (evitando colisión con el ID 1 existente)
+select setval('usuarios_id_seq', coalesce((select max(id) from usuarios), 1));
+

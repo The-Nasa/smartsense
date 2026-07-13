@@ -30,7 +30,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
         setLoading(true);
         const u = await api.getUsuario();
         setUser(u);
-        
+
         // Initialize form fields
         setNombre(u.nombre);
         setEmail(u.email);
@@ -52,7 +52,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
 
     try {
       setSavingField('profile');
-      const updated = await api.updateUsuario({
+      const updated = await api.updateUsuario(1, {
         nombre: nombre.trim(),
         email: email.trim(),
         telefono: telefono.trim(),
@@ -73,7 +73,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
 
     try {
       setSavingField('wifi');
-      const updated = await api.updateUsuario({
+      const updated = await api.updateUsuario(1, {
         wifi_ssid: wifiSsid.trim(),
         wifi_password: wifiPassword,
       });
@@ -96,7 +96,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
     onUpdateUser(nextUser);
 
     try {
-      await api.updateUsuario({ [field]: val });
+      await api.updateUsuario(1, { [field]: val });
     } catch (err) {
       console.error(`Error toggling ${field} status:`, err);
       // Revert if error
@@ -116,7 +116,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
-      
+
       {/* Title */}
       <div>
         <h1 className="text-xl font-black text-slate-800 font-display">Usuario & Configuración IoT</h1>
@@ -124,7 +124,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        
+
         {/* Card 1: Datos Personales */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-slate-50 pb-3">
@@ -134,7 +134,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
               </div>
               <h2 className="text-sm font-bold text-slate-800">Datos Personales</h2>
             </div>
-            
+
             {!editProfile && (
               <button
                 onClick={() => setEditProfile(true)}
@@ -364,7 +364,7 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
         </div>
 
         <div className="space-y-4 divide-y divide-slate-50">
-          
+
           {/* Email notifications toggle */}
           <div className="flex items-center justify-between pt-1">
             <div className="space-y-0.5 pr-4">
@@ -380,14 +380,12 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
 
             <button
               onClick={() => handleToggleNotification('notif_email', !user.notif_email)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-hidden shrink-0 ${
-                user.notif_email ? 'bg-indigo-600' : 'bg-slate-200'
-              }`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-hidden shrink-0 ${user.notif_email ? 'bg-indigo-600' : 'bg-slate-200'
+                }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  user.notif_email ? 'translate-x-6' : 'translate-x-1'
-                }`}
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${user.notif_email ? 'translate-x-6' : 'translate-x-1'
+                  }`}
               />
             </button>
           </div>
@@ -407,14 +405,12 @@ export default function UserWiFi({ onUpdateUser }: UserWiFiProps) {
 
             <button
               onClick={() => handleToggleNotification('notif_sms', !user.notif_sms)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-hidden shrink-0 ${
-                user.notif_sms ? 'bg-indigo-600' : 'bg-slate-200'
-              }`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-hidden shrink-0 ${user.notif_sms ? 'bg-indigo-600' : 'bg-slate-200'
+                }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  user.notif_sms ? 'translate-x-6' : 'translate-x-1'
-                }`}
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${user.notif_sms ? 'translate-x-6' : 'translate-x-1'
+                  }`}
               />
             </button>
           </div>

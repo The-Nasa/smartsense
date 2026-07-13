@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import AlertToast from './components/AlertToast';
@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard';
 import History from './pages/History';
 import Config from './pages/Config';
 import UserWiFi from './pages/UserWiFi';
+import ManageUsers from './pages/ManageUsers';
+import LoginLock from './components/LoginLock';
 import { api, getSupabaseConfig } from './lib/supabase';
 import { GasEvento, Usuario } from './types';
 
@@ -17,6 +19,97 @@ export default function App() {
   const [user, setUser] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    localStorage.getItem('smartsense_session_active') === 'true'
+  );
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(
+    localStorage.getItem('smartsense_sound_enabled') !== 'false'
+  );
+
+  // Refs for alarm audio and push notification cooldown
+  const alarmPlayingRef = useRef<boolean>(false);
+  const lastPushTimestampRef = useRef<number>(0);
+  const PUSH_COOLDOWN_MS = 30000; // 30 seconds between push notifications
+
+  const handleLogout = () => {
+    localStorage.removeItem('smartsense_session_active');
+    setIsAuthenticated(false);
+  };
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled(prev => {
+      const next = !prev;
+      localStorage.setItem('smartsense_sound_enabled', String(next));
+      return next;
+    });
+  }, []);
+
+  // --- AUDIBLE ALARM (Web Audio API — no external file needed) ---
+  const playAlarmBeep = useCallback(() => {
+    if (alarmPlayingRef.current) return; // Don't overlap beeps
+    alarmPlayingRef.current = true;
+
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+      // Play 3 rapid descending beeps
+      const beepDuration = 0.15;
+      const frequencies = [880, 660, 880]; // Hz: high-low-high pattern
+
+      frequencies.forEach((freq, i) => {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.type = 'square';
+        oscillator.frequency.value = freq;
+
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime + i * (beepDuration + 0.05));
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * (beepDuration + 0.05) + beepDuration);
+
+        oscillator.start(audioCtx.currentTime + i * (beepDuration + 0.05));
+        oscillator.stop(audioCtx.currentTime + i * (beepDuration + 0.05) + beepDuration);
+      });
+
+      // Release lock after all beeps finish
+      setTimeout(() => {
+        alarmPlayingRef.current = false;
+        audioCtx.close();
+      }, (frequencies.length * (beepDuration + 0.05) + 0.1) * 1000);
+    } catch (err) {
+      console.warn('Web Audio API not available for alarm:', err);
+      alarmPlayingRef.current = false;
+    }
+  }, []);
+
+  // --- BROWSER PUSH NOTIFICATIONS ---
+  useEffect(() => {
+    // Request permission on first authenticated load
+    if (isAuthenticated && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, [isAuthenticated]);
+
+  const sendPushNotification = useCallback((event: GasEvento) => {
+    const now = Date.now();
+    if (now - lastPushTimestampRef.current < PUSH_COOLDOWN_MS) return; // Cooldown active
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      lastPushTimestampRef.current = now;
+      try {
+        new Notification('⚠️ SmartSense — Fuga de Gas Detectada', {
+          body: `Nivel crítico: ${event.valor_gas} ppm. Toma precauciones de inmediato.`,
+          icon: '/favicon.ico',
+          tag: 'smartsense-alert', // Replaces previous notification instead of stacking
+          requireInteraction: true,
+        });
+      } catch (err) {
+        console.warn('Push notification failed:', err);
+      }
+    }
+  }, []);
 
   // Load configuration and user on mount
   useEffect(() => {
@@ -45,17 +138,25 @@ export default function App() {
     // Subscribe to unified real-time event stream (Supabase vs Simulator fallback)
     const unsubscribe = api.subscribeToEvents((event) => {
       setLastEvent(event);
-      
-      // If the incoming measurement crosses our active threshold, display the global toast alert
+
+      // If the incoming measurement crosses our active threshold
       if (event.valor_gas > umbral) {
         setActiveAlertEvent(event);
+
+        // Play audible alarm beep if sound is enabled
+        if (soundEnabled) {
+          playAlarmBeep();
+        }
+
+        // Send browser push notification (with cooldown)
+        sendPushNotification(event);
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [loading, umbral]);
+  }, [loading, umbral, soundEnabled, playAlarmBeep, sendPushNotification]);
 
   const handleUpdateUmbral = (newVal: number) => {
     setUmbral(newVal);
@@ -80,12 +181,16 @@ export default function App() {
     );
   }
 
+  if (!isAuthenticated) {
+    return <LoginLock onUnlock={() => setIsAuthenticated(true)} />;
+  }
+
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50/50 text-slate-800 flex">
-        
+
         {/* Persistent Side Navigation (Desktop) & Bottom Navigation (Mobile) */}
-        <Sidebar onOpenConfigModal={() => setIsConfigModalOpen(true)} />
+        <Sidebar onOpenConfigModal={() => setIsConfigModalOpen(true)} onLogout={handleLogout} soundEnabled={soundEnabled} onToggleSound={toggleSound} />
 
         {/* Global Toast Alert */}
         <AlertToast
@@ -103,7 +208,7 @@ export default function App() {
         <main className="flex-1 md:pl-64 min-h-screen flex flex-col">
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto flex-1">
             <Routes>
-              
+
               {/* Route 1: Main Monitoring Dashboard */}
               <Route
                 path="/"
@@ -137,6 +242,12 @@ export default function App() {
               <Route
                 path="/usuario"
                 element={<UserWiFi onUpdateUser={handleUpdateUser} />}
+              />
+
+              {/* Route 5: Manage alert recipients */}
+              <Route
+                path="/destinatarios"
+                element={<ManageUsers />}
               />
 
             </Routes>
