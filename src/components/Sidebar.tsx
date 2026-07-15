@@ -1,16 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { Flame, LineChart, ClipboardList, Settings, User, Database, Radio, Users, LogOut, Volume2, VolumeX } from 'lucide-react';
-import { getSupabaseConfig } from '../lib/supabase';
+import { Flame, LineChart, ClipboardList, Settings, User, Users, LogOut, Volume2, VolumeX } from 'lucide-react';
 
 interface SidebarProps {
-  onOpenConfigModal: () => void;
   onLogout: () => void;
   soundEnabled?: boolean;
   onToggleSound?: () => void;
 }
 
-export default function Sidebar({ onOpenConfigModal, onLogout, soundEnabled = true, onToggleSound }: SidebarProps) {
-  const config = getSupabaseConfig();
+export default function Sidebar({ onLogout, soundEnabled = true, onToggleSound }: SidebarProps) {
 
   const navItems = [
     { to: '/', label: 'Dashboard', icon: LineChart },
@@ -57,32 +54,6 @@ export default function Sidebar({ onOpenConfigModal, onLogout, soundEnabled = tr
             );
           })}
         </nav>
-
-        {/* Connection Status & Trigger Modal */}
-        <div className="p-4 border-t border-slate-100">
-          <button
-            onClick={onOpenConfigModal}
-            className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${config.isMock
-                ? 'bg-amber-50/40 border-amber-100 hover:bg-amber-50'
-                : 'bg-emerald-50/40 border-emerald-100 hover:bg-emerald-50'
-              }`}
-          >
-            <div className="flex items-center gap-2">
-              <div
-                className={`p-1.5 rounded-lg shrink-0 ${config.isMock ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                  }`}
-              >
-                {config.isMock ? <Radio className="w-3.5 h-3.5 animate-pulse" /> : <Database className="w-3.5 h-3.5" />}
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Estado Base</p>
-                <p className={`text-xs font-semibold ${config.isMock ? 'text-amber-700' : 'text-emerald-700'}`}>
-                  {config.isMock ? 'Modo Simulador' : 'Supabase Activo'}
-                </p>
-              </div>
-            </div>
-          </button>
-        </div>
 
         {/* Sound Toggle & Logout (Desktop) */}
         <div className="px-4 pb-4 space-y-2">

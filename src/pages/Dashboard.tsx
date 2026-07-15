@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Flame, ShieldCheck, ShieldAlert, AlertTriangle, Clock, TrendingUp, AlertOctagon, RefreshCw, Sparkles } from 'lucide-react';
+import { Flame, ShieldCheck, ShieldAlert, AlertTriangle, Clock, TrendingUp, AlertOctagon, RefreshCw } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
-import { api, mockDb } from '../lib/supabase';
+import { api } from '../lib/supabase';
 import { GasEvento } from '../types';
 
 interface DashboardProps {
   lastEvent: GasEvento | null;
   umbral: number;
-  onOpenConfigModal: () => void;
 }
 
-export default function Dashboard({ lastEvent, umbral, onOpenConfigModal }: DashboardProps) {
+export default function Dashboard({ lastEvent, umbral }: DashboardProps) {
   const [history, setHistory] = useState<GasEvento[]>([]);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
@@ -63,12 +62,10 @@ export default function Dashboard({ lastEvent, umbral, onOpenConfigModal }: Dash
   // Total de alertas del día
   const todayAlertsCount = () => {
     const todayStr = new Date().toDateString();
-    // Search in whole local history
-    const allTodayEvents = mockDb.getEventsRaw().filter((e) => {
+    return history.filter((e) => {
       const eDate = new Date(e.created_at).toDateString();
       return eDate === todayStr && e.valor_gas > umbral;
-    });
-    return allTodayEvents.length;
+    }).length;
   };
 
   // Último evento registrado (hace X minutos)
@@ -210,29 +207,21 @@ export default function Dashboard({ lastEvent, umbral, onOpenConfigModal }: Dash
 
       {/* Active Alert Warning Panel */}
       {isAlertActive && latestReading && (
-        <div className="bg-red-50 border border-red-200/60 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-pulse shadow-xs">
-          <div className="flex gap-3.5">
-            <div className="p-3 bg-red-600 text-white rounded-xl shadow-md">
-              <AlertOctagon className="w-6 h-6 animate-bounce" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-red-950 text-base font-display">Advertencia: ¡Concentración de Gas Crítica!</h3>
-              <p className="text-xs text-red-800 mt-0.5">
-                Se ha superado el umbral seguro de gas. Nivel detectado: <b className="font-mono text-sm">{latestReading.valor_gas} ppm</b>.
-              </p>
-              <div className="flex gap-4 text-[11px] text-red-600 mt-2 font-medium">
-                <span><b>Hora exacta:</b> {new Date(latestReading.created_at).toLocaleTimeString()}</span>
-                <span>•</span>
-                <span><b>Tiempo transcurrido:</b> {getActiveAlertDuration()}</span>
-              </div>
+        <div className="bg-red-50 border border-red-200/60 rounded-2xl p-5 flex items-start gap-4 shadow-xs">
+          <div className="p-3 bg-red-600 text-white rounded-xl shadow-md shrink-0">
+            <AlertOctagon className="w-6 h-6 animate-bounce" />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-red-950 text-base font-display">Advertencia: ¡Concentración de Gas Crítica!</h3>
+            <p className="text-xs text-red-800 mt-0.5">
+              Se ha superado el umbral seguro de gas. Nivel detectado: <b className="font-mono text-sm">{latestReading.valor_gas} ppm</b>.
+            </p>
+            <div className="flex gap-4 text-[11px] text-red-600 mt-2 font-medium">
+              <span><b>Hora exacta:</b> {new Date(latestReading.created_at).toLocaleTimeString()}</span>
+              <span>•</span>
+              <span><b>Tiempo transcurrido:</b> {getActiveAlertDuration()}</span>
             </div>
           </div>
-          <button
-            onClick={onOpenConfigModal}
-            className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase rounded-xl shadow-xs transition"
-          >
-            Verificar Conexión
-          </button>
         </div>
       )}
 
@@ -313,24 +302,6 @@ export default function Dashboard({ lastEvent, umbral, onOpenConfigModal }: Dash
           )}
         </div>
       </div>
-
-      {/* Simulator Guidance Quick Tip Banner */}
-      {api.isMock() && (
-        <div className="bg-indigo-50/40 border border-indigo-100/40 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-700">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse shrink-0" />
-            <p className="text-xs">
-              <b>Modo demostrativo activo:</b> El simulador genera lecturas automáticas. Puedes calibrar o forzar alertas instantáneas desde el panel de pruebas.
-            </p>
-          </div>
-          <button
-            onClick={onOpenConfigModal}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white hover:bg-slate-50 border border-indigo-100 px-3 py-1.5 rounded-xl shadow-2xs transition"
-          >
-            Abrir Panel de Control
-          </button>
-        </div>
-      )}
 
     </div>
   );

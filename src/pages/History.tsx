@@ -115,7 +115,7 @@ export default function History({ umbral }: HistoryProps) {
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
           <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider mb-3">
             <BarChart3 className="w-4 h-4" />
-            Metas del Periodo
+            Resumen del Periodo
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="p-2 bg-slate-50 rounded-xl">
@@ -248,7 +248,6 @@ export default function History({ umbral }: HistoryProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                <th className="px-6 py-4">ID Registro</th>
                 <th className="px-6 py-4">Fecha y Hora</th>
                 <th className="px-6 py-4">Valor Gas (ppm)</th>
                 <th className="px-6 py-4 text-center">Estado del Ambiente</th>
@@ -257,14 +256,14 @@ export default function History({ umbral }: HistoryProps) {
             <tbody className="divide-y divide-slate-100 text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-slate-400 font-medium">
+                  <td colSpan={3} className="px-6 py-10 text-center text-slate-400 font-medium">
                     <span className="animate-spin border-2 border-slate-300 border-t-indigo-600 rounded-full w-4 h-4 inline-block mr-2 align-middle" />
                     Buscando registros en la base de datos...
                   </td>
                 </tr>
               ) : paginatedEvents.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-slate-400 font-medium">
+                  <td colSpan={3} className="px-6 py-10 text-center text-slate-400 font-medium">
                     No se encontraron mediciones para el rango seleccionado.
                   </td>
                 </tr>
@@ -278,9 +277,6 @@ export default function History({ umbral }: HistoryProps) {
                         isAlert ? 'bg-red-50/40 hover:bg-red-50/60' : ''
                       }`}
                     >
-                      <td className="px-6 py-3.5 font-mono text-slate-400 text-[10px] select-all">
-                        {e.id}
-                      </td>
                       <td className="px-6 py-3.5 text-slate-700 font-medium">
                         {new Date(e.created_at).toLocaleString()}
                       </td>

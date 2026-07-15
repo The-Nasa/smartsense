@@ -19,4 +19,5 @@ export interface Usuario {
   wifi_password?: string;
   notif_email: boolean;
   notif_sms: boolean;
+  password?: string;
 }

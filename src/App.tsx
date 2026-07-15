@@ -2,14 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import AlertToast from './components/AlertToast';
-import SupabaseConfigModal from './components/SupabaseConfigModal';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
 import Config from './pages/Config';
 import UserWiFi from './pages/UserWiFi';
 import ManageUsers from './pages/ManageUsers';
 import LoginLock from './components/LoginLock';
-import { api, getSupabaseConfig } from './lib/supabase';
+import { api } from './lib/supabase';
 import { GasEvento, Usuario } from './types';
 
 export default function App() {
@@ -18,7 +17,6 @@ export default function App() {
   const [umbral, setUmbral] = useState<number>(1500);
   const [user, setUser] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
     localStorage.getItem('smartsense_session_active') === 'true'
   );
@@ -33,7 +31,9 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('smartsense_session_active');
+    localStorage.removeItem('smartsense_active_user_id');
     setIsAuthenticated(false);
+    setUser(null);
   };
 
   const toggleSound = useCallback(() => {
@@ -182,7 +182,10 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return <LoginLock onUnlock={() => setIsAuthenticated(true)} />;
+    return <LoginLock onUnlock={(loggedInUser) => {
+      setUser(loggedInUser);
+      setIsAuthenticated(true);
+    }} />;
   }
 
   return (
@@ -190,18 +193,12 @@ export default function App() {
       <div className="min-h-screen bg-slate-50/50 text-slate-800 flex">
 
         {/* Persistent Side Navigation (Desktop) & Bottom Navigation (Mobile) */}
-        <Sidebar onOpenConfigModal={() => setIsConfigModalOpen(true)} onLogout={handleLogout} soundEnabled={soundEnabled} onToggleSound={toggleSound} />
+        <Sidebar onLogout={handleLogout} soundEnabled={soundEnabled} onToggleSound={toggleSound} />
 
         {/* Global Toast Alert */}
         <AlertToast
           event={activeAlertEvent}
           onClose={() => setActiveAlertEvent(null)}
-        />
-
-        {/* Supabase Connection Setup & Info Wizard */}
-        <SupabaseConfigModal
-          isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
         />
 
         {/* Main Workspace Frame */}
@@ -216,7 +213,6 @@ export default function App() {
                   <Dashboard
                     lastEvent={lastEvent}
                     umbral={umbral}
-                    onOpenConfigModal={() => setIsConfigModalOpen(true)}
                   />
                 }
               />

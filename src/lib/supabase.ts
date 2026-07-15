@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
   IS_MOCK: 'smartsense_is_mock',
   EVENTS: 'smartsense_events',
   CONFIG: 'smartsense_config',
-  USER: 'smartsense_user'
+  USER: 'smartsense_user',
+  ACTIVE_USER_ID: 'smartsense_active_user_id'
 };
 
 const getStoredCredential = (key: string, envVal?: string): string => {
@@ -62,7 +63,8 @@ const initializeMockData = () => {
       wifi_ssid: 'SmartSense_IoT_2G',
       wifi_password: 'securepass123',
       notif_email: true,
-      notif_sms: false
+      notif_sms: false,
+      password: '123456'
     };
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(defaultUser));
   }
@@ -132,8 +134,23 @@ export const mockDb = {
       wifi_ssid: 'SmartSense_IoT_2G',
       wifi_password: 'securepass123',
       notif_email: true,
-      notif_sms: false
+      notif_sms: false,
+      password: '123456'
     };
+  },
+
+  login: (email: string, password: string): Usuario | null => {
+    // Check principal user
+    const principal = mockDb.getUsuario();
+    if (principal.email.toLowerCase() === email.toLowerCase() && principal.password === password) {
+      return principal;
+    }
+    // Check extra users list
+    const extras: Usuario[] = JSON.parse(localStorage.getItem('smartsense_users_list') || '[]');
+    const found = extras.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
+    );
+    return found || null;
   },
 
   updateUsuario: (updated: Partial<Usuario>): Usuario => {
@@ -258,16 +275,45 @@ export const api = {
     }
   },
 
-  getUsuario: async (): Promise<Usuario> => {
+  login: async (email: string, password: string): Promise<Usuario | null> => {
     const conf = getSupabaseConfig();
     if (conf.isMock || !supabase) {
-      return mockDb.getUsuario();
+      return mockDb.login(email, password);
     }
     try {
       const { data, error } = await supabase
         .from('usuarios')
         .select('*')
-        .eq('id', 1)
+        .ilike('email', email)
+        .eq('password', password)
+        .single();
+      if (error) {
+        if (error.code === 'PGRST116') return null; // No match
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      console.warn('Supabase login error, using mock fallback:', err);
+      return mockDb.login(email, password);
+    }
+  },
+
+  getUsuario: async (idOverride?: number): Promise<Usuario> => {
+    const conf = getSupabaseConfig();
+    const activeId = idOverride ?? Number(localStorage.getItem(STORAGE_KEYS.ACTIVE_USER_ID) ?? 1);
+    if (conf.isMock || !supabase) {
+      // For mock mode, if activeId is 1, return principal; otherwise look in extras list
+      if (activeId === 1 || !activeId) return mockDb.getUsuario();
+      const extras: Usuario[] = JSON.parse(localStorage.getItem('smartsense_users_list') || '[]');
+      const found = extras.find((u) => u.id === activeId);
+      return found || mockDb.getUsuario();
+    }
+    try {
+      const targetId = activeId || 1;
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id', targetId)
         .single();
       
       if (error) {
@@ -457,78 +503,6 @@ export const api = {
   }
 };
 
-// SIMULATOR REAL-TIME EVENT GENERATOR
-// This background process generates simulated readings if in mock mode or
-// as a test generator. It updates every 3 seconds.
-let simulatorInterval: NodeJS.Timeout | null = null;
-let currentGasTrend = 450; // Start clean
-
-export const startLiveSimulator = () => {
-  if (simulatorInterval) return;
-
-  simulatorInterval = setInterval(() => {
-    const isMock = api.isMock();
-    if (!isMock) return; // Only insert mock events if in mock mode
-
-    // Gas level simulation
-    // Normal level: 300 - 650 with noise.
-    // Every now and then, let's create a gas leak build-up or a quick burst
-    const time = Date.now();
-    const cycle = (time / 60000) % 10; // 10 minute full cycle
-    
-    let base = 400;
-    
-    // Create an elevated gas leak event for 1.5 minutes every 10 minutes
-    if (cycle > 4 && cycle < 5.5) {
-      // Escalating leak
-      const progress = (cycle - 4) / 1.5; // 0 to 1
-      base = 400 + progress * 3200; // climbs up to 3600
-    } else if (cycle >= 5.5 && cycle < 6.5) {
-      // Dissipating leak
-      const progress = (cycle - 5.5); // 0 to 1
-      base = 3600 - progress * 3000; // drops back to 600
-    }
-
-    // Add random noise
-    const noise = (Math.random() - 0.5) * 80;
-    const finalVal = Math.max(0, Math.min(4095, Math.floor(base + noise)));
-
-    mockDb.addEvent(finalVal);
-  }, 3000);
-};
-
-export const stopLiveSimulator = () => {
-  if (simulatorInterval) {
-    clearInterval(simulatorInterval);
-    simulatorInterval = null;
-  }
-};
-
-// Helper to manually trigger a gas leak event (useful for users to test their dashboards!)
-export const triggerManualLeak = async (intensity: 'leve' | 'moderada' | 'critica') => {
-  let val = 800;
-  if (intensity === 'moderada') val = 2200;
-  if (intensity === 'critica') val = 3850;
-
-  const conf = getSupabaseConfig();
-  if (conf.isMock || !supabase) {
-    mockDb.addEvent(val);
-  } else {
-    try {
-      const umbral = await api.getUmbral();
-      const alerta = val > umbral;
-      const { error } = await supabase
-        .from('gas_eventos')
-        .insert([{ valor_gas: val, alerta }]);
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error inserting manual leak to Supabase:', err);
-      // Fallback to local mock database if Supabase fails
-      mockDb.addEvent(val);
-    }
-  }
-};
-
 // Helper to save Supabase connection settings
 export const saveSupabaseCredentials = (url: string, key: string, useMock: boolean) => {
   localStorage.setItem(STORAGE_KEYS.URL, url);
@@ -545,6 +519,3 @@ export const clearSupabaseCredentials = () => {
   localStorage.setItem(STORAGE_KEYS.IS_MOCK, 'true');
   window.location.reload();
 };
-
-// Start the simulator automatically on load
-startLiveSimulator();
